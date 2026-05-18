@@ -1,0 +1,21 @@
+[project]
+name = "peering-portal"
+version = "0.1.0"
+description = "Peering portal to couple with Peering Manager"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.136",
+    "httpx>=0.28",
+    "uvicorn[standard]>=0.47",
+    "python-dotenv>=1.2",
+    "jinja2>=3.1",
+    "itsdangerous>=2.2",
+    "python-multipart>=0.0.28",
+]
+
+[project.optional-dependencies]
+dev = ["ruff>=0.15"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
