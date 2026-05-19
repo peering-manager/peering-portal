@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block step_indicator %}
+  {% with active = "welcome" %}{% include "_step_indicator.html" %}{% endwith %}
+{% endblock %}
+{% block content %}
+  <div class="row justify-content-center">
+    <div class="col-lg-8">
+      <div class="card shadow-sm">
+        <div class="card-body">
+          <h1 class="h3 mb-3">Request peering with AS{{ affiliated.asn }}</h1>
+          <p class="text-body-secondary">
+            Enter your network ASN and we'll show you the IXPs or facilities we have in common, then guide you through choosing the BGP sessions you want.
+          </p>
+
+          <form method="post" action="/lookup" class="mt-4">
+            <div class="mb-3">
+              <label for="asn" class="form-label">Your ASN</label>
+              <input
+                type="number"
+                class="form-control"
+                id="asn"
+                name="asn"
+                min="1"
+                max="4294967295"
+                required
+                autofocus
+              />
+              <div class="form-text">
+                Your network must be registered on
+                <a href="https://www.peeringdb.com" target="_blank" rel="noopener">PeeringDB</a>.
+              </div>
+            </div>
+
+            <div class="mb-3">
+              <label for="email" class="form-label">Contact email <span class="text-body-secondary">(optional)</span></label>
+              <input type="email" class="form-control" id="email" name="email" />
+            </div>
+
+            <fieldset class="mb-4">
+              <legend class="form-label fs-6">Peering type</legend>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="peer_type" id="peer_type_public" value="public" checked />
+                <label class="form-check-label" for="peer_type_public">
+                  <strong>Public peering</strong> - over Internet Exchange Points (IXPs)
+                </label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" name="peer_type" id="peer_type_private" value="private" />
+                <label class="form-check-label" for="peer_type_private">
+                  <strong>Private peering</strong> - direct interconnects in shared facilities
+                </label>
+              </div>
+            </fieldset>
+
+            <button type="submit" class="btn btn-primary">
+              Continue <i class="bi bi-arrow-right ms-1"></i>
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}

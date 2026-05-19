@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block content %}
+  {% set status = data.status %}
+
+  <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+    <a href="/requests" class="btn btn-sm btn-outline-secondary">
+      <i class="bi bi-arrow-left me-1"></i>All requests
+    </a>
+    <h1 class="h5 mb-0">Request details</h1>
+    {% with status=status %}{% include "_status_badge.html" %}{% endwith %}
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <dl class="row mb-0">
+        <dt class="col-sm-3">Tracking ID</dt>
+        <dd class="col-sm-9 font-monospace">{{ data.request_id }}</dd>
+
+        <dt class="col-sm-3">Requesting AS</dt>
+        <dd class="col-sm-9">AS{{ data.local_asn }}</dd>
+
+        <dt class="col-sm-3">Peering with</dt>
+        <dd class="col-sm-9">AS{{ data.peer_asn }}</dd>
+
+        <dt class="col-sm-3">Type</dt>
+        <dd class="col-sm-9">
+          {% if data.peer_type == "public" %}Public (IXP){% else %}Private (facility){% endif %}
+        </dd>
+
+        <dt class="col-sm-3">Submitted</dt>
+        <dd class="col-sm-9">{{ data.created }}</dd>
+
+        <dt class="col-sm-3">Last updated</dt>
+        <dd class="col-sm-9">{{ data.updated }}</dd>
+
+        {% if data.decision_comment %}
+          <dt class="col-sm-3">Operator comment</dt>
+          <dd class="col-sm-9">{{ data.decision_comment }}</dd>
+        {% endif %}
+      </dl>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <strong>Sessions ({{ data.sessions | length }})</strong>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Status</th>
+            <th>Location</th>
+            <th>Your IP</th>
+            <th>Comment</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for s in data.sessions %}
+            <tr>
+              <td>
+                {% with status=s.status %}{% include "_status_badge.html" %}{% endwith %}
+              </td>
+              <td>
+                {% if s.location_name %}
+                  {{ s.location_name }}<br />
+                {% endif %}
+                <code class="small text-body-secondary">{{ s.location }}</code>
+              </td>
+              <td><code>{{ s.local_ip }}</code></td>
+              <td class="text-body-secondary small">{{ s.rejection_comment or "" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {% if status == "pending" %}
+    <form id="cancel-form" method="post" action="/requests/{{ data.request_id }}/cancel" class="mt-3">
+      <button
+        type="button"
+        class="btn btn-outline-warning"
+        data-bs-toggle="modal"
+        data-bs-target="#cancel-confirm-modal"
+      >
+        <i class="bi bi-x-circle me-1"></i>Cancel this request
+      </button>
+    </form>
+
+    <div
+      class="modal fade"
+      id="cancel-confirm-modal"
+      tabindex="-1"
+      aria-labelledby="cancel-confirm-title"
+      aria-hidden="true"
+    >
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cancel-confirm-title">
+              Cancel peering request?
+            </h5>
+            <button
+              type="button"
+              class="btn-close"
+              data-bs-dismiss="modal"
+              aria-label="Close"
+            ></button>
+          </div>
+          <div class="modal-body">
+            <p class="mb-2">
+              You&rsquo;re about to cancel peering request
+              <code>{{ data.request_id }}</code>.
+            </p>
+            <p class="text-body-secondary small mb-0">
+              All pending sessions in this request will be marked as
+              cancelled. This cannot be undone.
+            </p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">
+              Keep request
+            </button>
+            <button type="submit" form="cancel-form" class="btn btn-warning">
+              <i class="bi bi-x-circle me-1"></i>Cancel request
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}

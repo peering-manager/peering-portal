@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block step_indicator %}
+  {% with active = "discover" %}{% include "_step_indicator.html" %}{% endwith %}
+{% endblock %}
+{% block content %}
+  <div class="row mb-4">
+    <div class="col-lg-8">
+      <h1 class="h4 mb-1">
+        AS{{ wizard.asn }}
+        {% if network.name %}- {{ network.name }}{% endif %}
+      </h1>
+      {% if network.policy_general %}
+        <span class="badge text-bg-info">Policy: {{ network.policy_general }}</span>
+      {% endif %}
+      {% if network.info_prefixes4 %}
+        <span class="badge text-bg-secondary">Max IPv4: {{ network.info_prefixes4 }}</span>
+      {% endif %}
+      {% if network.info_prefixes6 %}
+        <span class="badge text-bg-secondary">Max IPv6: {{ network.info_prefixes6 }}</span>
+      {% endif %}
+      {% if network.irr_as_set %}
+        <span class="badge text-bg-secondary">IRR: {{ network.irr_as_set }}</span>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if not locations %}
+    <div class="alert alert-warning">
+      <h2 class="h5 mb-2">No common
+      {% if wizard.peer_type == "public" %}IXPs{% else %}facilities{% endif %}
+      found</h2>
+      <p class="mb-0">
+        We don&rsquo;t share any
+        {% if wizard.peer_type == "public" %}Internet Exchange Point{% else %}facility{% endif %}
+        with AS{{ wizard.asn }} according to the local PeeringDB cache.
+        <a href="/" class="alert-link">Try a different ASN</a> or update your network presence on
+        <a href="https://www.peeringdb.com" target="_blank" rel="noopener">PeeringDB</a>.
+      </p>
+    </div>
+  {% else %}
+    <form method="post" action="/discover">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <p class="text-body-secondary mb-0">
+          Pick the
+          {% if wizard.peer_type == "public" %}IXPs{% else %}facilities{% endif %}
+          you want to peer at.
+        </p>
+        <div class="form-check mb-0">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            id="select-all-locations"
+            data-select-all="input[name='location']"
+          />
+          <label class="form-check-label small" for="select-all-locations">
+            Select all
+          </label>
+        </div>
+      </div>
+
+      <div class="row g-3">
+        {% for loc in locations %}
+          <div class="col-md-6">
+            <div class="card h-100">
+              <div class="card-body">
+                <div class="form-check">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    name="location"
+                    id="loc-{{ loop.index }}"
+                    value="{{ loc.location }}"
+                  />
+                  <label class="form-check-label w-100" for="loc-{{ loop.index }}">
+                    <strong>{{ loc.name }}</strong>
+                    <div class="small text-body-secondary mt-1">
+                      <code>{{ loc.location }}</code>
+                    </div>
+                    {% if wizard.peer_type == "public" %}
+                      <div class="small mt-2">
+                        {% set available = loc.sessions | rejectattr("existing") | list | length %}
+                        {% set taken = loc.sessions | selectattr("existing") | list | length %}
+                        {{ available }} session{{ "" if available == 1 else "s" }} available
+                        {% if taken %}
+                          &middot; <span class="text-body-secondary">{{ taken }} already configured</span>
+                        {% endif %}
+                      </div>
+                    {% endif %}
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        {% endfor %}
+      </div>
+
+      <div class="mt-4 d-flex justify-content-between">
+        <a href="/" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+        <button type="submit" class="btn btn-primary">
+          Continue <i class="bi bi-arrow-right ms-1"></i>
+        </button>
+      </div>
+    </form>
+  {% endif %}
+{% endblock %}

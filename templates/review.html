@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block step_indicator %}
+  {% with active = "review" %}{% include "_step_indicator.html" %}{% endwith %}
+{% endblock %}
+{% block content %}
+  <div class="card">
+    <div class="card-body">
+      <h1 class="h4 mb-3">Review your request</h1>
+      <dl class="row mb-4">
+        <dt class="col-sm-3">Requesting AS</dt>
+        <dd class="col-sm-9">
+          AS{{ wizard.asn }}{% if wizard.name %} - {{ wizard.name }}{% endif %}
+        </dd>
+
+        <dt class="col-sm-3">Peering with</dt>
+        <dd class="col-sm-9">AS{{ affiliated.asn }} - {{ affiliated.name }}</dd>
+
+        <dt class="col-sm-3">Peering type</dt>
+        <dd class="col-sm-9">
+          {% if wizard.peer_type == "public" %}Public (IXP){% else %}Private (facility){% endif %}
+        </dd>
+
+        {% if wizard.email %}
+          <dt class="col-sm-3">Contact email</dt>
+          <dd class="col-sm-9">{{ wizard.email }}</dd>
+        {% endif %}
+      </dl>
+
+      <h2 class="h6 text-uppercase text-body-secondary">Sessions ({{ wizard.chosen_sessions | length }})</h2>
+      <div class="table-responsive">
+        <table class="table table-sm">
+          <thead>
+            <tr>
+              <th>Location</th>
+              <th>Your IP</th>
+              <th>Peer IP</th>
+              <th>Password</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for s in wizard.chosen_sessions %}
+              <tr>
+                <td>
+                  {% if s.location_name and s.location_name != s.location %}
+                    <div>{{ s.location_name }}</div>
+                    <code class="text-body-secondary small">{{ s.location }}</code>
+                  {% else %}
+                    <code>{{ s.location }}</code>
+                  {% endif %}
+                </td>
+                <td><code>{{ s.local_ip }}</code></td>
+                <td>
+                  {% if s.peer_ip %}
+                    <code>{{ s.peer_ip }}</code>
+                  {% else %}
+                    <span class="text-body-secondary small">-</span>
+                  {% endif %}
+                </td>
+                <td>
+                  {% if s.session_secret %}
+                    <span class="badge text-bg-secondary">set</span>
+                  {% else %}
+                    <span class="text-body-secondary small">-</span>
+                  {% endif %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="alert alert-info small mb-4">
+        <i class="bi bi-info-circle me-1"></i>
+        Submitting this request does not establish any BGP session yet. The
+        operator of AS{{ affiliated.asn }} will review and accept or refuse it.
+      </div>
+
+      <form method="post" action="/submit" class="d-flex justify-content-between">
+        <a href="/sessions" class="btn btn-outline-secondary">
+          <i class="bi bi-arrow-left me-1"></i>Back
+        </a>
+        <button type="submit" class="btn btn-success">
+          Submit request <i class="bi bi-send ms-1"></i>
+        </button>
+      </form>
+    </div>
+  </div>
+{% endblock %}

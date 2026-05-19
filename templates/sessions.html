@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% block step_indicator %}
+  {% with active = "sessions" %}{% include "_step_indicator.html" %}{% endwith %}
+{% endblock %}
+{% block content %}
+  <form method="post" action="/sessions">
+    {% if wizard.peer_type == "public" %}
+      <p class="text-body-secondary">
+        Pick the BGP sessions you want at each IXP. Sessions already configured
+        with us are disabled and can&rsquo;t be re-requested.
+      </p>
+
+      {% for loc in locations %}
+        <div class="card mb-3">
+          <div class="card-header">
+            <strong>{{ loc.name }}</strong>
+            <code class="ms-2 text-body-secondary small">{{ loc.location }}</code>
+          </div>
+          <div class="table-responsive">
+            <table class="table table-sm mb-0 align-middle public-session-table">
+              <thead>
+                <tr>
+                  <th style="width: 3em;">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      title="Select all sessions on this IX"
+                      aria-label="Select all sessions on this IX"
+                      data-select-all="input[name='session']"
+                      data-select-all-scope=".card"
+                    />
+                  </th>
+                  <th class="w-25">AS{{ wizard.asn }}</th>
+                  <th class="w-25">AS{{ affiliated.asn }}</th>
+                  <th>BGP password (optional)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for s in loc.sessions %}
+                  <tr class="{{ 'text-body-secondary' if s.existing else '' }}">
+                    <td>
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        name="session"
+                        value="{{ loc.location }}|{{ s.local_ip }}|{{ s.peer_ip }}"
+                        id="s-{{ loc.location }}-{{ s.local_ip }}-{{ s.peer_ip }}"
+                        {% if s.existing %}disabled{% endif %}
+                      />
+                    </td>
+                    <td><code>{{ s.local_ip }}</code></td>
+                    <td><code>{{ s.peer_ip }}</code></td>
+                    <td>
+                      <input
+                        type="password"
+                        class="form-control form-control-sm"
+                        name="secret|{{ loc.location }}|{{ s.local_ip }}|{{ s.peer_ip }}"
+                        autocomplete="new-password"
+                        {% if s.existing %}disabled{% endif %}
+                      />
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          {% if loc.sessions | selectattr("existing") | list | length == loc.sessions | length %}
+            <div class="card-footer text-body-secondary small">
+              All sessions on this IX are already configured.
+            </div>
+          {% endif %}
+        </div>
+      {% endfor %}
+    {% else %}
+      <p class="text-body-secondary">
+        Tell us the IPs you want to peer with at each shared facility.
+      </p>
+
+      {% for loc in locations %}
+        <div class="card mb-3" data-location="{{ loc.location }}">
+          <div class="card-header">
+            <strong>{{ loc.name }}</strong>
+          </div>
+          <div class="card-body">
+            <table class="table table-sm align-middle private-session-table">
+              <thead>
+                <tr>
+                  <th class="w-25">AS{{ wizard.asn }}</th>
+                  <th class="w-25">AS{{ affiliated.asn }}</th>
+                  <th>BGP password (optional)</th>
+                  <th style="width: 3em;"></th>
+                </tr>
+              </thead>
+              <tbody data-rows>
+                <tr>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      name="private_local_ip|{{ loc.location }}"
+                      placeholder="e.g. 192.0.2.1/30"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="text"
+                      class="form-control form-control-sm"
+                      name="private_peer_ip|{{ loc.location }}"
+                      placeholder="e.g. 192.0.2.2/30"
+                      required
+                    />
+                  </td>
+                  <td>
+                    <input
+                      type="password"
+                      class="form-control form-control-sm"
+                      name="private_secret|{{ loc.location }}"
+                      autocomplete="new-password"
+                    />
+                  </td>
+                  <td class="text-end">
+                    <button type="button" class="btn btn-sm btn-outline-danger" data-remove-row>
+                      <i class="bi bi-x-lg"></i>
+                    </button>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <button type="button" class="btn btn-sm btn-outline-primary" data-add-row>
+              <i class="bi bi-plus-lg me-1"></i>Add another IP
+            </button>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+
+    <div class="mt-4 d-flex justify-content-between">
+      <a href="/discover" class="btn btn-outline-secondary">
+        <i class="bi bi-arrow-left me-1"></i>Back
+      </a>
+      <button type="submit" class="btn btn-primary">
+        Review <i class="bi bi-arrow-right ms-1"></i>
+      </button>
+    </div>
+  </form>
+{% endblock %}
+

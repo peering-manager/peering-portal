@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Peering Portal</title>
+    <script>
+      (function () {
+        var saved = localStorage.getItem("portal-theme");
+        var theme = saved || (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+        document.documentElement.setAttribute("data-bs-theme", theme);
+      })();
+    </script>
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+      integrity="sha384-sRIl4kxILFvY47J16cr9ZwB07vP4J8+LH7qKQnuqkuIAvNWLzeN8tE5YBujZqJLB"
+      crossorigin="anonymous"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"
+    />
+    <link href="/static/css/styles.css" rel="stylesheet" />
+  </head>
+  <body class="d-flex flex-column min-vh-100">
+    <nav class="navbar navbar-expand-lg border-bottom">
+      <div class="container">
+        <a class="navbar-brand fw-bold" href="/">
+          <i class="bi bi-diagram-3-fill me-2"></i>Peering Portal
+        </a>
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge text-bg-secondary d-none d-md-inline-flex align-items-center">
+            Peering with AS{{ affiliated.asn }} - {{ affiliated.name }}
+          </span>
+          <a href="/" class="btn btn-sm btn-outline-primary">
+            <i class="bi bi-plus-lg me-1"></i>New
+          </a>
+          <a href="/requests" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-list-check me-1"></i>My Requests
+            <span id="request-count-badge" class="badge text-bg-primary ms-1 d-none">0</span>
+          </a>
+          <button id="btn-theme-toggle" type="button" class="btn btn-sm btn-outline-secondary" title="Toggle theme">
+            <i class="bi bi-moon-fill"></i>
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <main class="container py-4 flex-grow-1">
+      {% block step_indicator %}{% endblock %}
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+          {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+              {{ message|safe }}
+              <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+          {% endfor %}
+        {% endif %}
+      {% endwith %}
+
+      {% block content %}{% endblock %}
+    </main>
+
+    <footer class="border-top py-3 mt-auto">
+      <div class="container text-center text-body-secondary small">
+        Peering Portal - a <a href="https://peering-manager.net" target="_blank" rel="noopener">Peering Manager</a> project
+      </div>
+    </footer>
+
+    <script
+      src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.8/dist/js/bootstrap.min.js"
+      integrity="sha384-G/EV+4j2dNv+tEPo3++6LCgdCROaejBqfUeNjuKAiuXbjrxilcCdDz6ZAVfHWe1Y"
+      crossorigin="anonymous"
+    ></script>
+    <script src="/static/js/portal.js"></script>
+    {% block extra_js %}{% endblock %}
+  </body>
+</html>

@@ -1,0 +1,9 @@
+{# Renders a coloured Bootstrap badge for a peering request or session status. #}
+{%- set badge = {
+  "pending":   "info",
+  "accepted":  "success",
+  "refused":   "danger",
+  "rejected":  "danger",
+  "cancelled": "warning",
+}.get(status, "secondary") -%}
+<span class="badge text-bg-{{ badge }} text-uppercase">{{ status }}</span>
