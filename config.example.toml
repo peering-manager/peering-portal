@@ -6,9 +6,11 @@ pm_url = "https://peering.example.com"
 # Peering Manager API token.
 # pm_token = "your-api-token-here"
 
-# Secret used to sign the wizard's session cookie.  Set a long random value
-# in production, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`.
-# secret_key = "change-me-in-production"
+# Secret used to sign the wizard's session cookie. When unset, a random key is
+# generated at startup and in-flight wizard sessions reset on every restart. Set
+# a stable value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`,
+# when running several replicas or restarting often.
+# secret_key = ""
 
 # Bind address / port for the built-in uvicorn runner.
 host = "0.0.0.0"

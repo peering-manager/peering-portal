@@ -1,4 +1,6 @@
-.step-indicator { padding: 0; }
+.step-indicator {
+  padding: 0;
+}
 .step-indicator .step {
   background: var(--bs-tertiary-bg);
   color: var(--bs-secondary-color);
@@ -16,19 +18,15 @@
   color: var(--bs-success-text-emphasis);
   border-color: var(--bs-success-border-subtle);
 }
-
 .card .form-check-label {
   cursor: pointer;
 }
-
 table code {
   font-size: 0.875em;
 }
-
 .public-session-table, .private-session-table {
   table-layout: fixed;
 }
-
 footer {
   background: var(--bs-tertiary-bg);
 }

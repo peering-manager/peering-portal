@@ -270,7 +270,7 @@ dependencies = [
     { name = "uvicorn", extra = ["standard"] },
 ]
 
-[package.optional-dependencies]
+[package.dev-dependencies]
 dev = [
     { name = "ruff" },
 ]
@@ -283,10 +283,11 @@ requires-dist = [
     { name = "jinja2", specifier = ">=3.1" },
     { name = "python-dotenv", specifier = ">=1.2" },
     { name = "python-multipart", specifier = ">=0.0.28" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.47" },
 ]
-provides-extras = ["dev"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "ruff", specifier = ">=0.15" }]
 
 [[package]]
 name = "pydantic"

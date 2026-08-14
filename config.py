@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import secrets
 import tomllib
 from pathlib import Path
 from typing import Any
@@ -40,7 +41,9 @@ def _resolve(env_key: str, *, default: Any = None, required: bool = False) -> An
 
 PM_URL: str = _resolve("PM_URL", required=True).rstrip("/")
 PM_TOKEN: str = _resolve("PM_TOKEN", required=True)
-SECRET_KEY: str = _resolve("SECRET_KEY", default="change-me-in-production")
-HOST: str = _resolve("HOST", default="0.0.0.0")  # noqa: S104
+# Sessions only hold wizard state, so an ephemeral key beats a well-known default: worst case a
+# restart resets in-flight wizards instead of leaving cookies signed with a public value
+SECRET_KEY: str = _resolve("SECRET_KEY", default="") or secrets.token_hex(32)
+HOST: str = _resolve("HOST", default="0.0.0.0")
 PORT: int = int(_resolve("PORT", default=8080))
 RELOAD: bool = _truthy(_resolve("RELOAD", default=False))
