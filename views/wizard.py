@@ -3,17 +3,35 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Depends, Form, Request
 from markupsafe import Markup
 
 from api import api_request
 from constants import ASN_MAX, ASN_MIN
 from enums import PeeringRequestType
-from functions import api_error_message, conflicting_ips
+from functions import api_error_message, conflicting_ips, parse_asn
+from oauth import asn_allowed, current_user, require_user
 from sessions import deduplicate_sessions, parse_private_sessions, parse_public_sessions
 from templating import flash, redirect, render
 
 router = APIRouter()
+signed_in = APIRouter(dependencies=[Depends(require_user)])
+
+
+def _wizard(request: Request) -> dict[str, Any] | None:
+    """
+    Return the wizard in progress, or `None` when there is none to carry on with.
+
+    The ASN is checked again on every step: the wizard lives in the session, and a session outlives
+    a sign-out. Nobody must inherit the ASN of whoever used the browser before.
+    """
+    wizard = request.session.get("wizard")
+    if not wizard:
+        return None
+    if not asn_allowed(request, wizard.get("asn")):
+        request.session.pop("wizard", None)
+        return None
+    return wizard
 
 
 async def _fetch_locations(request: Request, asn: int, peer_type: str) -> list[dict[str, Any]] | None:
@@ -25,13 +43,12 @@ async def _fetch_locations(request: Request, asn: int, peer_type: str) -> list[d
     return resp.json().get("locations", [])
 
 
-# Welcome
 @router.get("/")
 async def welcome(request: Request):
-    return render(request, "welcome.html", {"wizard": request.session.get("wizard", {})})
+    return render(request, "welcome.html", {"wizard": _wizard(request) or {}})
 
 
-@router.post("/lookup")
+@signed_in.post("/lookup")
 async def lookup(
     request: Request,
     asn: str = Form(...),
@@ -42,16 +59,16 @@ async def lookup(
         flash(request, "Invalid peering type.")
         return redirect("/")
 
-    # Parsed by hand instead of `Form(int)` so a bad value flashes instead of returning raw JSON;
-    # a leading "AS" is tolerated as networks are often written down that way
-    try:
-        number = int(asn.strip().upper().removeprefix("AS"))
-    except ValueError:
-        flash(request, f"{asn!r} is not a valid AS number.")
+    # Parsed by hand instead of `Form(int)` so a bad value flashes instead of returning raw JSON
+    number = parse_asn(asn)
+    if number is None:
+        flash(request, f"{asn!r} is not a valid AS number, it must be between {ASN_MIN} and {ASN_MAX}.")
         return redirect("/")
 
-    if not ASN_MIN <= number <= ASN_MAX:
-        flash(request, f"An AS number must be between {ASN_MIN} and {ASN_MAX}.")
+    # The form only offers the networks of the signed-in user, so a rejection here means a tampered
+    # submission or a stale form left open across a sign-out
+    if not asn_allowed(request, number):
+        flash(request, f"Your PeeringDB account is not affiliated with AS{number}.")
         return redirect("/")
 
     resp = await api_request("GET", f"network/{number}")
@@ -72,16 +89,16 @@ async def lookup(
     request.session["wizard"] = {
         "asn": number,
         "name": resp.json().get("name", ""),
-        "email": email,
+        # The PeeringDB address is the one the operator can trust, so it stands in for a blank field
+        "email": email.strip() or (current_user(request) or {}).get("email", ""),
         "peer_type": peer_type,
     }
     return redirect("/discover")
 
 
-# Shared locations, IXPs or facilities
-@router.get("/discover")
+@signed_in.get("/discover")
 async def discover(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard:
         return redirect("/")
 
@@ -95,9 +112,9 @@ async def discover(request: Request):
     return render(request, "discover.html", {"wizard": wizard, "network": network, "locations": locations})
 
 
-@router.post("/discover")
+@signed_in.post("/discover")
 async def discover_submit(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard:
         return redirect("/")
 
@@ -112,10 +129,9 @@ async def discover_submit(request: Request):
     return redirect("/sessions")
 
 
-# BGP session selection
-@router.get("/sessions")
+@signed_in.get("/sessions")
 async def sessions(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard or not wizard.get("selected_locations"):
         return redirect("/")
 
@@ -128,9 +144,9 @@ async def sessions(request: Request):
     return render(request, "sessions.html", {"wizard": wizard, "locations": selected_locations})
 
 
-@router.post("/sessions")
+@signed_in.post("/sessions")
 async def sessions_submit(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard:
         return redirect("/")
 
@@ -162,18 +178,17 @@ async def sessions_submit(request: Request):
     return redirect("/review")
 
 
-# Review and submit
-@router.get("/review")
+@signed_in.get("/review")
 async def review(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard or not wizard.get("chosen_sessions"):
         return redirect("/")
     return render(request, "review.html", {"wizard": wizard})
 
 
-@router.post("/submit")
+@signed_in.post("/submit")
 async def submit(request: Request):
-    wizard = request.session.get("wizard")
+    wizard = _wizard(request)
     if not wizard or not wizard.get("chosen_sessions"):
         return redirect("/")
 
@@ -211,6 +226,9 @@ async def submit(request: Request):
     return redirect(f"/success/{quote(str(request_id), safe='')}")
 
 
-@router.get("/success/{request_id}")
+@signed_in.get("/success/{request_id}")
 async def success(request: Request, request_id: str):
     return render(request, "success.html", {"request_id": request_id})
+
+
+router.include_router(signed_in)
