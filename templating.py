@@ -8,8 +8,10 @@ from fastapi.templating import Jinja2Templates
 from markupsafe import escape
 
 from api import affiliated_as
+from config import OAUTH_ENABLED
 from enums import status_colour
 from functions import format_datetime
+from oauth import current_user
 
 if TYPE_CHECKING:
     from fastapi import Request
@@ -38,9 +40,11 @@ def pop_flashes(request: Request) -> list[tuple[str, str]]:
 
 
 def render(request: Request, name: str, ctx: dict[str, Any] | None = None) -> Response:
-    """Render a template with the common context, the affiliated AS and the queued flashes."""
+    """Render a template with the common context, the affiliated AS, the visitor and the queued flashes."""
     base_ctx: dict[str, Any] = {
         "affiliated": affiliated_as,
+        "oauth_enabled": OAUTH_ENABLED,
+        "user": current_user(request),
         "get_flashed_messages": lambda with_categories=False: (
             pop_flashes(request) if with_categories else [m for _, m in pop_flashes(request)]
         ),
