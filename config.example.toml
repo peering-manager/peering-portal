@@ -6,11 +6,35 @@ pm_url = "https://peering.example.com"
 # Peering Manager API token.
 # pm_token = "your-api-token-here"
 
-# Secret used to sign the wizard's session cookie. When unset, a random key is
-# generated at startup and in-flight wizard sessions reset on every restart. Set
-# a stable value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`,
-# when running several replicas or restarting often.
+# Secret used to sign the session cookie, which carries the wizard state and the PeeringDB sign-in.
+# When unset, a random key is generated at startup and every visitor is signed out on restart. Set
+# a stable value, e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`, when running
+# several replicas or restarting often.
 # secret_key = ""
+
+# Set to true when the portal is served over HTTPS, to mark the session cookie as secure.
+# session_cookie_secure = false
+
+# PeeringDB OAuth. Without these two values the portal accepts any ASN from any visitor, which lets
+# anybody request peering in the name of a network they do not own. Register an application on
+# https://www.peeringdb.com/oauth2/applications/ as a confidential client using the authorization
+# code grant, with the redirect URI below.
+# pdb_client_id = ""
+# pdb_client_secret = ""
+
+# Public URL of the callback route. It must match the redirect URI registered on PeeringDB exactly.
+# When unset, the portal builds it from the incoming request, which is wrong behind a reverse proxy.
+# pdb_redirect_uri = "https://your-portal.example.com/auth/callback"
+
+# Rights a network must grant the user on PeeringDB before the portal accepts a request for it.
+# PeeringDB grants 1 read, 2 update, 4 create and 8 delete, added together. 0 accepts any
+# affiliation, 2 keeps out the members who can only read the network.
+# pdb_required_perms = 0
+
+# PeeringDB endpoints. Only set these when PeeringDB moves them.
+# pdb_authorize_url = "https://auth.peeringdb.com/oauth2/authorize/"
+# pdb_token_url = "https://auth.peeringdb.com/oauth2/token/"
+# pdb_userinfo_url = "https://auth.peeringdb.com/profile/v1"
 
 # Bind address / port for the built-in uvicorn runner.
 host = "0.0.0.0"
