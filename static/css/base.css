@@ -30,3 +30,9 @@ table code {
 footer {
   background: var(--bs-tertiary-bg);
 }
+/* The PeeringDB square mark keeps its colours on a light and on a dark background */
+.pdb-mark {
+  height: 1.25em;
+  width: auto;
+  vertical-align: -0.25em;
+}

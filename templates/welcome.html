@@ -6,26 +6,86 @@
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-lg-8">
+    {% if oauth_enabled and not user %}
+    <div class="card shadow-sm">
+      <div class="card-body text-center">
+        <div class="display-5 text-primary mb-3"><i class="bi bi-shield-lock"></i></div>
+        <h1 class="h3 mb-3">Request peering with AS{{ affiliated.asn }}</h1>
+        <p class="text-body-secondary">
+          Sign in with your PeeringDB account first. It tells us which networks you may request
+          peering for, so nobody can file a request in your name.
+        </p>
+        <a href="/login" class="btn btn-primary btn-lg mt-2">
+          <img src="/static/img/peeringdb-mark.png" alt="" class="pdb-mark me-2">Sign in with PeeringDB
+        </a>
+        <p class="form-text mt-3 mb-0">
+          You need a <a href="https://www.peeringdb.com" target="_blank" rel="noopener">PeeringDB</a>
+          account affiliated with your network. The portal reads your profile and your affiliations,
+          nothing else.
+        </p>
+      </div>
+    </div>
+
+    {% elif oauth_enabled and not user.networks %}
+    <div class="alert alert-warning">
+      <h2 class="h5 mb-2">No network affiliation</h2>
+      <p class="mb-0">
+        Your PeeringDB account is not affiliated with any network the portal can accept a request
+        for. Ask an administrator of your organisation to affiliate you on
+        <a href="https://www.peeringdb.com" target="_blank" rel="noopener">PeeringDB</a>, then sign
+        in again.
+      </p>
+    </div>
+
+    {% else %}
     <div class="card shadow-sm">
       <div class="card-body">
         <h1 class="h3 mb-3">Request peering with AS{{ affiliated.asn }}</h1>
         <p class="text-body-secondary">
-          Enter your network ASN and we'll show you the IXPs or facilities we have in common, then guide you through choosing the BGP sessions you want.
+          {% if oauth_enabled %}
+          Pick the network you request peering for, and we'll show you the IXPs or facilities we have
+          in common, then guide you through choosing the BGP sessions you want.
+          {% else %}
+          Enter your network ASN and we'll show you the IXPs or facilities we have in common, then
+          guide you through choosing the BGP sessions you want.
+          {% endif %}
         </p>
+
+        {% if not oauth_enabled %}
+        <div class="alert alert-warning small">
+          <i class="bi bi-exclamation-triangle me-1"></i>
+          This portal does not check that you own the network you ask peering for. The operator has
+          to confirm it by hand.
+        </div>
+        {% endif %}
 
         <form method="post" action="/lookup" class="mt-4">
           <div class="mb-3">
             <label for="asn" class="form-label">Your ASN</label>
+            {% if oauth_enabled %}
+            <select class="form-select" id="asn" name="asn" required autofocus>
+              {% for network in user.networks %}
+              <option value="{{ network.asn }}"{% if wizard.asn == network.asn %} selected{% endif %}>AS{{ network.asn }}{% if network.name %} - {{ network.name }}{% endif %}</option>
+              {% endfor %}
+            </select>
+            <div class="form-text">
+              These are the networks your PeeringDB account is affiliated with.
+            </div>
+            {% else %}
             <input type="number" class="form-control" id="asn" name="asn" min="1" max="4294967295" value="{{ wizard.asn or '' }}" required autofocus>
             <div class="form-text">
               Your network must be registered on
               <a href="https://www.peeringdb.com" target="_blank" rel="noopener">PeeringDB</a>.
             </div>
+            {% endif %}
           </div>
 
           <div class="mb-3">
             <label for="email" class="form-label">Contact email <span class="text-body-secondary">(optional)</span></label>
-            <input type="email" class="form-control" id="email" name="email" value="{{ wizard.email or '' }}">
+            <input type="email" class="form-control" id="email" name="email" value="{{ wizard.email or user.email or '' }}">
+            {% if oauth_enabled and user.email %}
+            <div class="form-text">Taken from your PeeringDB account. Change it if another address suits better.</div>
+            {% endif %}
           </div>
 
           <fieldset class="mb-4">
@@ -44,6 +104,7 @@
         </form>
       </div>
     </div>
+    {% endif %}
   </div>
 </div>
 {% endblock %}
