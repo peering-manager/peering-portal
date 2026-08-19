@@ -5,10 +5,21 @@ import uuid
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
+from constants import ASN_MAX, ASN_MIN
+
 if TYPE_CHECKING:
     import httpx
 
-__all__ = ("api_error_message", "conflicting_ips", "flatten_errors", "format_datetime", "parse_tracking_id", "valid_ip")
+__all__ = (
+    "api_error_message",
+    "conflicting_ips",
+    "flatten_errors",
+    "format_datetime",
+    "parse_asn",
+    "parse_tracking_id",
+    "safe_path",
+    "valid_ip",
+)
 
 
 def format_datetime(value: str) -> str:
@@ -28,6 +39,32 @@ def parse_tracking_id(value: str) -> str | None:
         return str(uuid.UUID(value.strip()))
     except ValueError:
         return None
+
+
+def parse_asn(value: object) -> int | None:
+    """
+    Return `value` as an AS number, or `None` when it is not one.
+
+    A leading "AS" is tolerated as networks are often written down that way.
+    """
+    try:
+        number = int(str(value).strip().upper().removeprefix("AS"))
+    except (TypeError, ValueError):
+        return None
+    return number if ASN_MIN <= number <= ASN_MAX else None
+
+
+def safe_path(value: str, default: str = "/") -> str:
+    """
+    Return `value` when it is a path inside this app, `default` otherwise.
+
+    The value reaches the portal as a query parameter, so it must not send the visitor to another
+    site. A backslash is rejected too: some browsers read it as a slash.
+    """
+    value = value.strip()
+    if not value.startswith("/") or value.startswith("//") or "\\" in value:
+        return default
+    return value
 
 
 def valid_ip(value: str) -> bool:
