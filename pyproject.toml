@@ -5,7 +5,7 @@ version = "0.1.0"
 authors = [{ name = "Guillaume Mazoyer", email = "pm@mazoyer.eu" }]
 readme = "README.md"
 license = "Apache-2.0"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141",
     "httpx>=0.28",
@@ -33,17 +33,7 @@ indent-width = 4
 
 [tool.ruff.lint]
 ignore = [
-    "C901",    # Is too complex
-    "E501",    # Line too long
-    "F403",    # Unable to detect undefined names
-    "F405",    # May be undefined, or defined from star imports
-    "PLC0415", # `import` should be at the top-level of a file
-    "PLR0911", # Too many return statements
-    "PLR0912", # Too many branches
-    "PLR0913", # Too many arguments in function definition
-    "PLR0915", # Too many statements
     "PLR2004", # Magic value used in comparison, consider replacing with a constant variable
-    "RUF012",  # Mutable class attributes should be annotated with `typing.ClassVar`
 ]
 select = [
     "ASYNC", # flake8-async

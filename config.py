@@ -34,7 +34,8 @@ def _resolve(env_key: str, *, default: Any = None, required: bool = False) -> An
         return file_value
     if required:
         raise RuntimeError(
-            f"{env_key} is not set. Provide it via the {env_key} environment variable or as {env_key.lower()!r} in {_FILE_PATH}."
+            f"{env_key} is not set. Provide it via the {env_key} environment variable or as {env_key.lower()!r} in "
+            f"{_FILE_PATH}."
         )
     return default
 

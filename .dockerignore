@@ -173,3 +173,5 @@ pyrightconfig.json
 .git
 .env.example
 config.example.toml
+
+**/__pycache__/
