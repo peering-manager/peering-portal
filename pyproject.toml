@@ -32,9 +32,6 @@ line-length = 120
 indent-width = 4
 
 [tool.ruff.lint]
-ignore = [
-    "PLR2004", # Magic value used in comparison, consider replacing with a constant variable
-]
 select = [
     "ASYNC", # flake8-async
     "B",     # flake8-bugbear

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http import HTTPStatus
 from typing import Any
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -23,7 +24,7 @@ async def _fetch_request(request: Request, tracking_id: str) -> dict[str, Any] |
     """
     resp = await api_request("GET", f"sessions/{tracking_id}")
     if not resp.is_success:
-        if resp.status_code == 404:
+        if resp.status_code == HTTPStatus.NOT_FOUND:
             flash(request, "Request not found. The tracking ID may be invalid.")
             request.session["unknown_request_id"] = tracking_id
         else:
@@ -78,11 +79,11 @@ async def request_cancel(request: Request, request_id: str):
         return redirect("/requests")
 
     resp = await api_request("DELETE", f"sessions/{tracking_id}")
-    if resp.status_code == 204:
+    if resp.status_code == HTTPStatus.NO_CONTENT:
         flash(request, "Request cancelled.", "success")
-    elif resp.status_code == 409:
+    elif resp.status_code == HTTPStatus.CONFLICT:
         flash(request, api_error_message(resp, "This request has already been processed and cannot be cancelled."))
-    elif resp.status_code == 404:
+    elif resp.status_code == HTTPStatus.NOT_FOUND:
         # The detail page would 404 again and stack a second flash, go back to the index instead
         flash(request, "Request not found.")
         return redirect("/requests")

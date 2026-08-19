@@ -34,11 +34,11 @@ def parse_public_sessions(*, form: FormData, location_names: dict[str, str]) -> 
     chosen: list[dict[str, Any]] = []
 
     for value in _text_values(form, "session"):
-        parts = value.split("|", 2)
-        if len(parts) != 3 or not all(parts):
+        try:
+            location, local_ip, peer_ip = value.split("|", 2)
+        except ValueError:
             continue
-        location, local_ip, peer_ip = parts
-        if not valid_ip(local_ip) or not valid_ip(peer_ip):
+        if not all((location, local_ip, peer_ip)) or not valid_ip(local_ip) or not valid_ip(peer_ip):
             continue
         secret = _text(form.get(f"secret|{location}|{local_ip}|{peer_ip}")).strip()
         chosen.append(

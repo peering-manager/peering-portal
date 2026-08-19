@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from http import HTTPStatus
 from typing import Any
 from urllib.parse import quote
 
@@ -73,7 +74,7 @@ async def lookup(
 
     resp = await api_request("GET", f"network/{number}")
     if not resp.is_success:
-        if resp.status_code == 404:
+        if resp.status_code == HTTPStatus.NOT_FOUND:
             flash(
                 request,
                 Markup(
@@ -211,7 +212,7 @@ async def submit(request: Request):
     if not resp.is_success:
         default = (
             "A conflicting peering request already exists."
-            if resp.status_code == 409
+            if resp.status_code == HTTPStatus.CONFLICT
             else "The peering request could not be submitted."
         )
         message = api_error_message(resp, default)

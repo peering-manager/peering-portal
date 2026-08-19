@@ -20,7 +20,7 @@ class ChoiceSetMeta(type):
         # Split the choice tuples into value/label pairs and a value/colour map
         choices = attrs.get("CHOICES", ())
         attrs["_choices"] = tuple((c[0], c[1]) for c in choices)
-        attrs["colours"] = {c[0]: c[2] for c in choices if len(c) == 3}
+        attrs["colours"] = {c[0]: c[2] for c in choices if len(c) == 3}  # noqa: PLR2004
         return super().__new__(mcs, name, bases, attrs)
 
     def __iter__(cls):

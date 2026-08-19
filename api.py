@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -48,7 +49,7 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
         except httpx.HTTPError as exc:
             logger.warning(f"peering manager is unreachable (attempt {attempt}/{STARTUP_ATTEMPTS}): {exc}")
             continue
-        if resp.is_success or resp.status_code < 500:
+        if resp.is_success or resp.status_code < HTTPStatus.INTERNAL_SERVER_ERROR:
             break
         logger.warning(
             f"fetching the affiliated as returned HTTP {resp.status_code} (attempt {attempt}/{STARTUP_ATTEMPTS})"
