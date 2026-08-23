@@ -1,0 +1,38 @@
+---
+# docker compose -f docker-compose.yaml -f docker-compose.traefik.yaml up -d
+#
+# Set PORTAL_HOST and ACME_EMAIL in `.env` first. The name in PORTAL_HOST must resolve to this host
+# from the internet, and ports 80 and 443 must reach it: Let's Encrypt checks both before it signs.
+services:
+  traefik:
+    image: traefik:latest
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedByDefault=false
+      - --entrypoints.web.address=:80
+      - --entrypoints.web.http.redirections.entrypoint.to=websecure
+      - --entrypoints.web.http.redirections.entrypoint.scheme=https
+      - --entrypoints.websecure.address=:443
+      - --certificatesresolvers.le.acme.email=${ACME_EMAIL}
+      - --certificatesresolvers.le.acme.storage=/letsencrypt/acme.json
+      - --certificatesresolvers.le.acme.tlschallenge=true
+      # Uncomment to test against the Let's Encrypt staging CA. Delete the volume when you switch back to prod.
+      # - --certificatesresolvers.le.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-acme:/letsencrypt
+    restart: unless-stopped
+
+  portal:
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portal.rule=Host(`${PORTAL_HOST}`)
+      - traefik.http.routers.portal.entrypoints=websecure
+      - traefik.http.routers.portal.tls.certresolver=le
+      - traefik.http.services.portal.loadbalancer.server.port=8080
+
+volumes:
+  traefik-acme:

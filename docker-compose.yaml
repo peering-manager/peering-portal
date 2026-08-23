@@ -1,0 +1,17 @@
+---
+services:
+  portal:
+    image: peeringmanager/peering-portal:latest
+    # Set BIND=0.0.0.0 to serve the portal directly, without a proxy.
+    ports:
+      - "${BIND:-127.0.0.1}:${PORT:-8080}:8080"
+    environment:
+      - PM_URL=${PM_URL}
+      - PM_TOKEN=${PM_TOKEN}
+      - SECRET_KEY=${SECRET_KEY}
+      - SESSION_COOKIE_SECURE=${SESSION_COOKIE_SECURE:-}
+      - PDB_CLIENT_ID=${PDB_CLIENT_ID:-}
+      - PDB_CLIENT_SECRET=${PDB_CLIENT_SECRET:-}
+      - PDB_REDIRECT_URI=${PDB_REDIRECT_URI:-}
+      - PDB_REQUIRED_PERMS=${PDB_REQUIRED_PERMS:-0}
+    restart: unless-stopped
