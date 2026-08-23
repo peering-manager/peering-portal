@@ -55,6 +55,14 @@ async def oauth_callback(request: Request, code: str = "", state: str = "", erro
         flash(request, NO_NETWORK_MESSAGE, "warning")
         return redirect("/")
 
+    if user.get("dropped"):
+        flash(
+            request,
+            f"Your PeeringDB account is affiliated with more networks than the portal can carry, so "
+            f"{user['dropped']} of them are missing below. Ask the operator if you need one of those.",
+            "warning",
+        )
+
     flash(request, f"Signed in as {user['name']}.", "success")
     return redirect(pending.get("next") or "/")
 

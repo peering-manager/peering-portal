@@ -2,8 +2,10 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import json
 import logging
 import secrets
+import time
 from typing import Any
 from urllib.parse import urlencode
 
@@ -34,27 +36,27 @@ __all__ = (
     "sign_out",
     "store_user",
     "take_pending_login",
+    "touch",
 )
 
 logger = logging.getLogger("peering.portal")
 
-# `networks` is the scope that adds the affiliations to the profile, without it the portal has no
-# ASN allowlist to enforce. `openid` is left out on purpose: the portal reads the profile endpoint
-# and never has to validate an ID token.
+# `networks` carries the affiliations that become the allowlist, without it there is nothing to enforce
 SCOPE = "profile email networks"
+
 USER_KEY = "pdb_user"
 PENDING_KEY = "pdb_login"
+SEEN_KEY = "seen"
+TOUCH_INTERVAL = 5 * 60
+SESSION_LIFETIME = 12 * 60 * 60
+# A browser silently drops a cookie over 4096 bytes, so the network list has to stay under this
+NETWORKS_BUDGET = 2500
 HTTP_TIMEOUT = 15.0
 GENERIC_FAILURE = "The PeeringDB sign-in failed. Please try again in a moment."
 
 
 def redirect_uri(request: Request) -> str:
-    """
-    Return the callback URL PeeringDB must send the visitor back to.
-
-    PeeringDB matches it against the registered one, so a deployment behind a reverse proxy has to
-    configure it: the URL the app builds carries the scheme and host uvicorn sees, not the public ones.
-    """
+    """Return the callback URL, which a proxied deployment has to configure: PeeringDB matches it exactly."""
     return PDB_REDIRECT_URI or str(request.url_for("oauth_callback"))
 
 
@@ -86,12 +88,7 @@ def authorisation_url(request: Request, *, callback: str, next_path: str) -> str
 
 
 def take_pending_login(request: Request, state: str) -> dict[str, str]:
-    """
-    Return the stored sign-in attempt matching `state` and drop it from the session.
-
-    The state ties the callback to the browser that started the sign-in, which is what stops an
-    attacker from having a visitor finish somebody else's authorisation.
-    """
+    """Return the stored attempt matching `state`, which ties this callback to the browser that began it."""
     pending = request.session.pop(PENDING_KEY, None)
     if not isinstance(pending, dict):
         raise OAuthError("The sign-in attempt expired. Please try again.")
@@ -126,7 +123,7 @@ async def _fetch_token(client: httpx.AsyncClient, *, code: str, verifier: str, c
         raise OAuthError(GENERIC_FAILURE) from exc
 
     if not resp.is_success:
-        # The body can hold the client secret back, so it stays in the log and never reaches a page
+        # The body can echo the client secret, so it stays in the log
         logger.error(f"the peeringdb token endpoint returned HTTP {resp.status_code}: {resp.text[:500]}")
         raise OAuthError(GENERIC_FAILURE)
 
@@ -161,12 +158,7 @@ async def _fetch_userinfo(client: httpx.AsyncClient, token: str) -> dict[str, An
 
 
 def _networks(profile: dict[str, Any]) -> list[dict[str, Any]]:
-    """
-    Return the networks the profile may act on behalf of, one entry per AS number.
-
-    PeeringDB lists an affiliation with the rights it grants. A row without a usable ASN, or short of
-    the rights the operator asks for, is dropped: the list becomes the allowlist of the session.
-    """
+    """Return the networks the profile may act for, one per AS number. This list is the allowlist."""
     networks: dict[int, dict[str, Any]] = {}
 
     for entry in profile.get("networks") or []:
@@ -179,35 +171,65 @@ def _networks(profile: dict[str, Any]) -> list[dict[str, Any]]:
         perms = perms if isinstance(perms, int) else 0
         if PDB_REQUIRED_PERMS and perms & PDB_REQUIRED_PERMS != PDB_REQUIRED_PERMS:
             continue
-        networks[asn] = {"asn": asn, "name": str(entry.get("name") or ""), "perms": perms}
+        networks[asn] = {"asn": asn, "name": str(entry.get("name") or "")}
 
     return sorted(networks.values(), key=lambda network: network["asn"])
 
 
+def _fit(networks: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Trim the list to what a cookie carries, names first, and say how many networks did not fit."""
+    if len(json.dumps(networks)) <= NETWORKS_BUDGET:
+        return networks, 0
+
+    bare = [{"asn": network["asn"]} for network in networks]
+    if len(json.dumps(bare)) <= NETWORKS_BUDGET:
+        logger.info(f"a profile carries {len(networks)} networks, dropping their names to fit the session cookie")
+        return bare, 0
+
+    kept: list[dict[str, Any]] = []
+    for entry in bare:
+        kept.append(entry)
+        if len(json.dumps(kept)) > NETWORKS_BUDGET:
+            kept.pop()
+            break
+    dropped = len(bare) - len(kept)
+    logger.warning(f"a profile carries {len(networks)} networks, {dropped} do not fit the session cookie")
+    return kept, dropped
+
+
 def store_user(request: Request, profile: dict[str, Any]) -> dict[str, Any]:
     """Keep the identity and the networks of the profile in the session, and return them."""
+    networks, dropped = _fit(_networks(profile))
     user = {
         "name": str(profile.get("name") or profile.get("given_name") or "PeeringDB user"),
         "email": str(profile.get("email") or ""),
-        "verified_email": bool(profile.get("verified_email") or profile.get("email_verified")),
-        "networks": _networks(profile),
+        "signed_in": int(time.time()),
+        "networks": networks,
     }
+    if dropped:
+        user["dropped"] = dropped
     request.session[USER_KEY] = user
     return user
 
 
 def sign_out(request: Request) -> None:
     """Drop the sign-in and everything it authorised."""
-    for key in (USER_KEY, PENDING_KEY, "wizard"):
+    for key in (USER_KEY, PENDING_KEY, SEEN_KEY, "wizard"):
         request.session.pop(key, None)
 
 
 def current_user(request: Request) -> dict[str, Any] | None:
-    """Return the signed-in PeeringDB user, or `None` when there is none."""
+    """Return the signed-in PeeringDB user, or `None` once there is none or the sign-in went stale."""
     if not OAUTH_ENABLED:
         return None
     user = request.session.get(USER_KEY)
-    return user if isinstance(user, dict) else None
+    if not isinstance(user, dict):
+        return None
+    signed_in = user.get("signed_in")
+    if int(time.time()) - (signed_in if isinstance(signed_in, int) else 0) >= SESSION_LIFETIME:
+        sign_out(request)
+        return None
+    return user
 
 
 def allowed_asns(request: Request) -> list[int]:
@@ -217,23 +239,27 @@ def allowed_asns(request: Request) -> list[int]:
 
 
 def asn_allowed(request: Request, asn: object) -> bool:
-    """
-    Return whether the visitor may act on behalf of `asn`.
-
-    Without OAuth credentials the portal cannot tell one visitor from another, so it accepts every
-    ASN. That is the behaviour the portal had before, and the startup log says so.
-    """
+    """Return whether the visitor may act for `asn`. Without OAuth credentials every ASN is accepted."""
     if not OAUTH_ENABLED:
         return True
     number = parse_asn(asn)
     return number is not None and number in allowed_asns(request)
 
 
+def touch(request: Request) -> None:
+    """Write a stamp now and then, so the session cookie outlives a run of pages that only read it."""
+    stamp = request.session.get(SEEN_KEY)
+    now = int(time.time())
+    if now - (stamp if isinstance(stamp, int) else 0) >= TOUCH_INTERVAL:
+        request.session[SEEN_KEY] = now
+
+
 def require_user(request: Request) -> dict[str, Any] | None:
-    """Route dependency: let the request through only once PeeringDB vouched for the visitor."""
+    """Route dependency: let the request through, and keep the visitor signed in, once vouched for."""
     if not OAUTH_ENABLED:
         return None
     user = current_user(request)
     if user is None:
         raise NotAuthenticatedError
+    touch(request)
     return user

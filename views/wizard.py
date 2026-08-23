@@ -20,12 +20,7 @@ signed_in = APIRouter(dependencies=[Depends(require_user)])
 
 
 def _wizard(request: Request) -> dict[str, Any] | None:
-    """
-    Return the wizard in progress, or `None` when there is none to carry on with.
-
-    The ASN is checked again on every step: the wizard lives in the session, and a session outlives
-    a sign-out. Nobody must inherit the ASN of whoever used the browser before.
-    """
+    """Return the wizard in progress, re-checking its ASN: nobody inherits the previous visitor's."""
     wizard = request.session.get("wizard")
     if not wizard:
         return None
@@ -66,8 +61,7 @@ async def lookup(
         flash(request, f"{asn!r} is not a valid AS number, it must be between {ASN_MIN} and {ASN_MAX}.")
         return redirect("/")
 
-    # The form only offers the networks of the signed-in user, so a rejection here means a tampered
-    # submission or a stale form left open across a sign-out
+    # The form only offers their own networks, so a rejection here means a tampered submission
     if not asn_allowed(request, number):
         flash(request, f"Your PeeringDB account is not affiliated with AS{number}.")
         return redirect("/")
@@ -153,7 +147,6 @@ async def sessions_submit(request: Request):
 
     form = await request.form()
 
-    # Map location id back to its name so the review page can show it
     locations = await _fetch_locations(request, wizard["asn"], wizard["peer_type"])
     if locations is None:
         return redirect("/sessions")
