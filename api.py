@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 
-from config import PM_TOKEN, PM_URL
+from config import settings
 from exceptions import PeeringManagerError
 
 if TYPE_CHECKING:
@@ -34,8 +34,8 @@ async def lifespan(_: FastAPI) -> AsyncGenerator[None]:
     """Open the API client and fetch the affiliated AS on startup, close the client on shutdown."""
     global client  # noqa: PLW0603
     client = httpx.AsyncClient(
-        base_url=f"{PM_URL}{API_BASE_PATH}",
-        headers={"Authorization": f"Token {PM_TOKEN}"},
+        base_url=f"{settings.pm_url}{API_BASE_PATH}",
+        headers={"Authorization": f"Token {settings.pm_token}"},
         timeout=CLIENT_TIMEOUT,
         transport=httpx.AsyncHTTPTransport(retries=CLIENT_RETRIES),
     )

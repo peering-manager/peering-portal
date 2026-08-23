@@ -12,16 +12,7 @@ from urllib.parse import urlencode
 import httpx
 from fastapi import Request  # noqa: TC002
 
-from config import (
-    OAUTH_ENABLED,
-    PDB_AUTHORIZE_URL,
-    PDB_CLIENT_ID,
-    PDB_CLIENT_SECRET,
-    PDB_REDIRECT_URI,
-    PDB_REQUIRED_PERMS,
-    PDB_TOKEN_URL,
-    PDB_USERINFO_URL,
-)
+from config import settings
 from exceptions import NotAuthenticatedError, OAuthError
 from functions import parse_asn
 
@@ -57,7 +48,7 @@ GENERIC_FAILURE = "The PeeringDB sign-in failed. Please try again in a moment."
 
 def redirect_uri(request: Request) -> str:
     """Return the callback URL, which a proxied deployment has to configure: PeeringDB matches it exactly."""
-    return PDB_REDIRECT_URI or str(request.url_for("oauth_callback"))
+    return settings.pdb_redirect_uri or str(request.url_for("oauth_callback"))
 
 
 def _pkce_pair() -> tuple[str, str]:
@@ -76,7 +67,7 @@ def authorisation_url(request: Request, *, callback: str, next_path: str) -> str
     query = urlencode(
         {
             "response_type": "code",
-            "client_id": PDB_CLIENT_ID,
+            "client_id": settings.pdb_client_id,
             "redirect_uri": callback,
             "scope": SCOPE,
             "state": state,
@@ -84,7 +75,7 @@ def authorisation_url(request: Request, *, callback: str, next_path: str) -> str
             "code_challenge_method": "S256",
         }
     )
-    return f"{PDB_AUTHORIZE_URL}?{query}"
+    return f"{settings.pdb_authorize_url}?{query}"
 
 
 def take_pending_login(request: Request, state: str) -> dict[str, str]:
@@ -107,13 +98,13 @@ async def fetch_profile(*, code: str, verifier: str, callback: str) -> dict[str,
 async def _fetch_token(client: httpx.AsyncClient, *, code: str, verifier: str, callback: str) -> str:
     try:
         resp = await client.post(
-            PDB_TOKEN_URL,
+            settings.pdb_token_url,
             data={
                 "grant_type": "authorization_code",
                 "code": code,
                 "redirect_uri": callback,
-                "client_id": PDB_CLIENT_ID,
-                "client_secret": PDB_CLIENT_SECRET,
+                "client_id": settings.pdb_client_id,
+                "client_secret": settings.pdb_client_secret,
                 "code_verifier": verifier,
             },
             headers={"Accept": "application/json"},
@@ -139,7 +130,7 @@ async def _fetch_token(client: httpx.AsyncClient, *, code: str, verifier: str, c
 
 async def _fetch_userinfo(client: httpx.AsyncClient, token: str) -> dict[str, Any]:
     try:
-        resp = await client.get(PDB_USERINFO_URL, headers={"Authorization": f"Bearer {token}"})
+        resp = await client.get(settings.pdb_userinfo_url, headers={"Authorization": f"Bearer {token}"})
     except httpx.HTTPError as exc:
         logger.error(f"the peeringdb profile endpoint is unreachable: {exc}")
         raise OAuthError(GENERIC_FAILURE) from exc
@@ -169,7 +160,7 @@ def _networks(profile: dict[str, Any]) -> list[dict[str, Any]]:
             continue
         perms = entry.get("perms")
         perms = perms if isinstance(perms, int) else 0
-        if PDB_REQUIRED_PERMS and perms & PDB_REQUIRED_PERMS != PDB_REQUIRED_PERMS:
+        if settings.pdb_required_perms and perms & settings.pdb_required_perms != settings.pdb_required_perms:
             continue
         networks[asn] = {"asn": asn, "name": str(entry.get("name") or "")}
 
@@ -220,7 +211,7 @@ def sign_out(request: Request) -> None:
 
 def current_user(request: Request) -> dict[str, Any] | None:
     """Return the signed-in PeeringDB user, or `None` once there is none or the sign-in went stale."""
-    if not OAUTH_ENABLED:
+    if not settings.oauth_enabled:
         return None
     user = request.session.get(USER_KEY)
     if not isinstance(user, dict):
@@ -240,7 +231,7 @@ def allowed_asns(request: Request) -> list[int]:
 
 def asn_allowed(request: Request, asn: object) -> bool:
     """Return whether the visitor may act for `asn`. Without OAuth credentials every ASN is accepted."""
-    if not OAUTH_ENABLED:
+    if not settings.oauth_enabled:
         return True
     number = parse_asn(asn)
     return number is not None and number in allowed_asns(request)
@@ -256,7 +247,7 @@ def touch(request: Request) -> None:
 
 def require_user(request: Request) -> dict[str, Any] | None:
     """Route dependency: let the request through, and keep the visitor signed in, once vouched for."""
-    if not OAUTH_ENABLED:
+    if not settings.oauth_enabled:
         return None
     user = current_user(request)
     if user is None:

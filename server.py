@@ -11,7 +11,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.middleware.sessions import SessionMiddleware
 
 from api import lifespan
-from config import HOST, OAUTH_ENABLED, PORT, RELOAD, SECRET_KEY, SESSION_COOKIE_SECURE
+from config import settings
 from exceptions import NotAuthenticatedError, OAuthError, PeeringManagerError
 from templating import flash, redirect
 from views import auth_router, requests_router, wizard_router
@@ -25,7 +25,7 @@ SESSION_MAX_AGE = 30 * 60
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger("peering.portal")
 
-if not OAUTH_ENABLED:
+if not settings.oauth_enabled:
     logger.warning(
         "PeeringDB OAuth is off: any visitor can file a request for any ASN. Set PDB_CLIENT_ID and "
         "PDB_CLIENT_SECRET to make the portal check that the requester owns the network."
@@ -33,7 +33,11 @@ if not OAUTH_ENABLED:
 
 app = FastAPI(title="Peering Portal", docs_url=None, redoc_url=None, lifespan=lifespan)
 app.add_middleware(
-    SessionMiddleware, secret_key=SECRET_KEY, max_age=SESSION_MAX_AGE, same_site="lax", https_only=SESSION_COOKIE_SECURE
+    SessionMiddleware,
+    secret_key=settings.secret_key,
+    max_age=SESSION_MAX_AGE,
+    same_site="lax",
+    https_only=settings.session_cookie_secure,
 )
 
 
@@ -64,4 +68,4 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 
 
 if __name__ == "__main__":
-    uvicorn.run("server:app", host=HOST, port=PORT, reload=RELOAD)
+    uvicorn.run("server:app", host=settings.host, port=settings.port, reload=settings.reload)

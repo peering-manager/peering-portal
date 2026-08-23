@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Query, Request
 from markupsafe import Markup
 
-from config import OAUTH_ENABLED
+from config import settings
 from exceptions import OAuthError
 from functions import safe_path
 from oauth import authorisation_url, current_user, fetch_profile, redirect_uri, sign_out, store_user, take_pending_login
@@ -20,7 +20,7 @@ NO_NETWORK_MESSAGE = Markup(
 
 @router.get("/login")
 async def login(request: Request, next_path: str = Query("/", alias="next")):
-    if not OAUTH_ENABLED:
+    if not settings.oauth_enabled:
         return redirect("/")
 
     destination = safe_path(next_path)
@@ -32,7 +32,7 @@ async def login(request: Request, next_path: str = Query("/", alias="next")):
 
 @router.get("/auth/callback", name="oauth_callback")
 async def oauth_callback(request: Request, code: str = "", state: str = "", error: str = ""):
-    if not OAUTH_ENABLED:
+    if not settings.oauth_enabled:
         return redirect("/")
 
     # Taken first so a denied sign-in clears the attempt too, and cannot be replayed

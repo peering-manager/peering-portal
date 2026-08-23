@@ -2,67 +2,87 @@ from __future__ import annotations
 
 import os
 import secrets
-import tomllib
 from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from pydantic import ValidationError, field_validator, model_validator
+from pydantic_settings import BaseSettings, PydanticBaseSettingsSource, SettingsConfigDict, TomlConfigSettingsSource
 
+# Read `.env` before the settings, so PORTAL_CONFIG itself can live there
 load_dotenv()
-
-_FILE_PATH = Path(os.getenv("PORTAL_CONFIG", "config.toml"))
-_FILE_DATA: dict[str, Any] = {}
-if _FILE_PATH.is_file():
-    with _FILE_PATH.open("rb") as f:
-        _FILE_DATA = tomllib.load(f)
+CONFIG_FILE = Path(os.getenv("PORTAL_CONFIG", "config.toml"))
 
 
-def _truthy(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        return value.strip().lower() in ("1", "true", "yes", "on")
-    return bool(value)
+class Settings(BaseSettings):
+    """Everything the portal reads, from the environment first and from the TOML file second."""
+
+    model_config = SettingsConfigDict(extra="ignore", toml_file=CONFIG_FILE)
+
+    pm_url: str
+    pm_token: str
+    secret_key: str = ""
+    session_cookie_secure: bool = False
+    host: str = "0.0.0.0"
+    port: int = 8080
+    reload: bool = False
+
+    pdb_client_id: str = ""
+    pdb_client_secret: str = ""
+    pdb_redirect_uri: str = ""
+    pdb_authorize_url: str = "https://auth.peeringdb.com/oauth2/authorize/"
+    pdb_token_url: str = "https://auth.peeringdb.com/oauth2/token/"
+    pdb_userinfo_url: str = "https://auth.peeringdb.com/profile/v1"
+    # PeeringDB grants 0x01 read, 0x02 update, 0x04 create and 0x08 delete. Zero takes any affiliation.
+    pdb_required_perms: int = 0
+
+    @classmethod
+    def settings_customise_sources(
+        cls,
+        settings_cls: type[BaseSettings],
+        init_settings: PydanticBaseSettingsSource,
+        env_settings: PydanticBaseSettingsSource,
+        dotenv_settings: PydanticBaseSettingsSource,
+        file_secret_settings: PydanticBaseSettingsSource,
+    ) -> tuple[PydanticBaseSettingsSource, ...]:
+        return env_settings, TomlConfigSettingsSource(settings_cls)
+
+    @field_validator("session_cookie_secure", "reload", mode="before")
+    @classmethod
+    def _blank_is_off(cls, value: Any) -> Any:
+        return False if value == "" else value
+
+    @field_validator("pm_url")
+    @classmethod
+    def _no_trailing_slash(cls, value: str) -> str:
+        return value.rstrip("/")
+
+    @model_validator(mode="after")
+    def _ephemeral_secret_key(self) -> Settings:
+        # A key per process beats a public default: a restart signs everybody out, nothing worse
+        if not self.secret_key:
+            self.secret_key = secrets.token_hex(32)
+        return self
+
+    @property
+    def oauth_enabled(self) -> bool:
+        """Whether the portal holds the credentials it needs to check who owns an ASN."""
+        return bool(self.pdb_client_id and self.pdb_client_secret)
 
 
-def _resolve(env_key: str, *, default: Any = None, required: bool = False) -> Any:
-    """Resolve a single config value following the precedence rules."""
-    if env_key in os.environ:
-        return os.environ[env_key]
-    file_value = _FILE_DATA.get(env_key.lower())
-    if file_value is not None:
-        return file_value
-    if required:
+def _load() -> Settings:
+    try:
+        return Settings()
+    except ValidationError as exc:
+        missing = [str(error["loc"][0]).upper() for error in exc.errors() if error["type"] == "missing"]
+        if not missing:
+            raise
+        names = ", ".join(missing[:-1]) + (" and " if missing[:-1] else "") + missing[-1]
+        verb = "is" if len(missing) == 1 else "are"
         raise RuntimeError(
-            f"{env_key} is not set. Provide it via the {env_key} environment variable or as {env_key.lower()!r} in "
-            f"{_FILE_PATH}."
-        )
-    return default
+            f"{names} {verb} not set. The portal reads a setting from the environment, or from "
+            f"{CONFIG_FILE} under its lower case name."
+        ) from exc
 
 
-PM_URL: str = _resolve("PM_URL", required=True).rstrip("/")
-PM_TOKEN: str = _resolve("PM_TOKEN", required=True)
-# Sessions hold the wizard state and the PeeringDB sign-in, so an ephemeral key beats a well-known
-# default: worst case a restart signs everybody out instead of leaving cookies signed with a public value
-SECRET_KEY: str = _resolve("SECRET_KEY", default="") or secrets.token_hex(32)
-# Set this on any deployment served over HTTPS: the session cookie carries the PeeringDB sign-in
-SESSION_COOKIE_SECURE: bool = _truthy(_resolve("SESSION_COOKIE_SECURE", default=False))
-HOST: str = _resolve("HOST", default="0.0.0.0")
-PORT: int = int(_resolve("PORT", default=8080))
-RELOAD: bool = _truthy(_resolve("RELOAD", default=False))
-
-# PeeringDB OAuth. Register an application on https://www.peeringdb.com/oauth2/applications/ as a
-# confidential client with the authorization code grant. The endpoints come from
-# https://auth.peeringdb.com/.well-known/openid-configuration and only need a value here when
-# PeeringDB moves them.
-PDB_CLIENT_ID: str = _resolve("PDB_CLIENT_ID", default="")
-PDB_CLIENT_SECRET: str = _resolve("PDB_CLIENT_SECRET", default="")
-PDB_REDIRECT_URI: str = _resolve("PDB_REDIRECT_URI", default="")
-PDB_AUTHORIZE_URL: str = _resolve("PDB_AUTHORIZE_URL", default="https://auth.peeringdb.com/oauth2/authorize/")
-PDB_TOKEN_URL: str = _resolve("PDB_TOKEN_URL", default="https://auth.peeringdb.com/oauth2/token/")
-PDB_USERINFO_URL: str = _resolve("PDB_USERINFO_URL", default="https://auth.peeringdb.com/profile/v1")
-# Bitmask a network must grant the user before the portal accepts a request for it. PeeringDB grants
-# 0x01 read, 0x02 update, 0x04 create and 0x08 delete. Zero accepts any affiliation.
-PDB_REQUIRED_PERMS: int = int(_resolve("PDB_REQUIRED_PERMS", default=0))
-
-OAUTH_ENABLED: bool = bool(PDB_CLIENT_ID and PDB_CLIENT_SECRET)
+settings = _load()
