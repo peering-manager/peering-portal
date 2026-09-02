@@ -16,6 +16,12 @@ Browser  <--HTML-->  FastAPI portal                    /api/peering/portal/
 One API token authenticates the portal to Peering Manager. PeeringDB tells the
 portal which networks a visitor may act for, see [ASN ownership](#asn-ownership).
 
+The portal has its own version numbers, so it needs a matching server:
+
+| Portal | Peering Manager |
+| --- | --- |
+| 0.x | 1.11 or later |
+
 ## Quick start
 
 You need Python 3.12+, a Peering Manager 1.11+ instance, and an API token from a
